@@ -1,0 +1,1 @@
+# structure_generator_based_on_r_group
