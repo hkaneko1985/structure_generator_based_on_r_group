@@ -1,1 +1,3 @@
-# structure_generator_based_on_r_group
+# Structure Generator based on R-Group (SGRG)
+
+For more details, please go to ***
