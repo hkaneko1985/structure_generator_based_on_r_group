@@ -17,7 +17,10 @@ bond_list = [Chem.rdchem.BondType.UNSPECIFIED, Chem.rdchem.BondType.SINGLE, Chem
              Chem.rdchem.BondType.ZERO]
 
 main_molecule = Chem.MolFromMolFile('main_structure.mol')
-fragment_molecules = [molecule for molecule in Chem.SDMolSupplier('fragments.sdf') if molecule is not None]
+fragment_molecules = [molecule for molecule in Chem.SmilesMolSupplier('fragments.smi',
+                                                                      delimiter='\t', titleLine=False)
+                     if molecule is not None]
+#fragment_molecules = [molecule for molecule in Chem.SDMolSupplier('fragments.sdf') if molecule is not None]
 number_of_fragment_molecules = len(fragment_molecules)
 
 # make adjacency matrix and get atoms for main molecule
