@@ -36,16 +36,16 @@ r_index_in_main_molecule_old = [index for index, atom in enumerate(main_atoms) i
 r_index_in_main_molecule_new = []
 main_atom_number = main_adjacency_matrix.shape[0]
 for index, r_index in enumerate(r_index_in_main_molecule_old):
-    main_atoms[-index - 1], main_atoms[r_index] = main_atoms[r_index], main_atoms[-index - 1]
-    tmp = main_adjacency_matrix[:, main_atom_number - index - 1:main_atom_number - index].copy()
-    main_adjacency_matrix[:, main_atom_number - index - 1:main_atom_number - index] = main_adjacency_matrix[:,
-                                                                                      r_index:r_index + 1]
-    main_adjacency_matrix[:, r_index:r_index + 1] = tmp
-    tmp = main_adjacency_matrix[main_atom_number - index - 1:main_atom_number - index, :].copy()
-    main_adjacency_matrix[main_atom_number - index - 1:main_atom_number - index, :] = main_adjacency_matrix[
-                                                                                      r_index:r_index + 1, :]
-    main_adjacency_matrix[r_index:r_index + 1, :] = tmp
-    r_index_in_main_molecule_new.append(len(main_atoms) - index - 1)
+    modified_index = r_index - index
+    atom = main_atoms.pop(modified_index)
+    main_atoms.append(atom)
+    tmp = main_adjacency_matrix[:, modified_index:modified_index + 1].copy()
+    main_adjacency_matrix = np.delete(main_adjacency_matrix, modified_index, 1)
+    main_adjacency_matrix = np.c_[main_adjacency_matrix, tmp]
+    tmp = main_adjacency_matrix[modified_index:modified_index + 1, :].copy()
+    main_adjacency_matrix = np.delete(main_adjacency_matrix, modified_index, 0)
+    main_adjacency_matrix = np.r_[main_adjacency_matrix, tmp]
+r_index_in_main_molecule_new = [index for index, atom in enumerate(main_atoms) if atom == '*']
 
 r_bonded_atom_index_in_main_molecule = []
 for number in r_index_in_main_molecule_new:
