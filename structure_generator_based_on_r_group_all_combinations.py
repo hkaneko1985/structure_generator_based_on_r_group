@@ -33,8 +33,6 @@ for atom in main_molecule.GetAtoms():
     main_atoms.append(atom.GetSymbol())
 
 r_index_in_main_molecule_old = [index for index, atom in enumerate(main_atoms) if atom == '*']
-r_index_in_main_molecule_new = []
-main_atom_number = main_adjacency_matrix.shape[0]
 for index, r_index in enumerate(r_index_in_main_molecule_old):
     modified_index = r_index - index
     atom = main_atoms.pop(modified_index)
