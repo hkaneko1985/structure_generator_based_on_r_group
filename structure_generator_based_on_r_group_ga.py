@@ -3,23 +3,23 @@
 @author: hkaneko
 """
 
+import random
 import sys
 
 import numpy as np
 import pandas as pd
+import structure_generator
+from deap import base
+from deap import creator
+from deap import tools
 from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors
 from rdkit.ML.Descriptors import MoleculeDescriptors
-import structure_generator
+from scipy.spatial.distance import cdist
 from sklearn import metrics
 from sklearn import svm
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.model_selection import cross_val_predict, GridSearchCV
-import random
-from deap import base
-from deap import creator
-from deap import tools
-from scipy.spatial.distance import cdist
 
 dataset = pd.read_csv('molecules_with_logS.csv', index_col=0)  # SMILES 付きデータセットの読み込み
 file_name_of_main_fragments = 'sample_main_fragments.smi'  # 'r_group' 主骨格のフラグメントがあるファイル名。サンプルとして、'sample_main_fragments.smi' があります。
@@ -42,7 +42,7 @@ minimum_number = -10 ** 10
 
 if method_name != 'pls' and method_name != 'svr':
     sys.exit('\'{0}\' という回帰分析手法はありません。method_name を見直してください。'.format(method_name))
-    
+
 smiles = dataset.iloc[:, 0]  # 分子の SMILES
 y = dataset.iloc[:, 1]  # 物性・活性などの目的変数
 
@@ -129,10 +129,10 @@ if method_name == 'pls':
 # 構造生成
 main_molecules = [molecule for molecule in Chem.SmilesMolSupplier(file_name_of_main_fragments,
                                                                   delimiter='\t', titleLine=False)
-                if molecule is not None]
+                  if molecule is not None]
 fragment_molecules = [molecule for molecule in Chem.SmilesMolSupplier(file_name_of_sub_fragments,
                                                                       delimiter='\t', titleLine=False)
-                     if molecule is not None]
+                      if molecule is not None]
 
 creator.create('FitnessMax', base.Fitness, weights=(1.0,))  # for minimization, set weights as (-1.0,)
 creator.create('Individual', list, fitness=creator.FitnessMax)
@@ -156,16 +156,20 @@ toolbox.register('population', tools.initRepeat, list, toolbox.individual)
 
 def evalOneMax(individual):
     individual_array = np.array(individual)
-    generated_smiles = structure_generator.structure_generator_based_on_r_group(main_molecules, fragment_molecules, individual_array)
+    generated_smiles = structure_generator.structure_generator_based_on_r_group(main_molecules, fragment_molecules,
+                                                                                individual_array)
     generated_molecule = Chem.MolFromSmiles(generated_smiles)
     if generated_molecule is not None:
         AllChem.Compute2DCoords(generated_molecule)
         descriptors_of_generated_molecule = descriptor_calculator.CalcDescriptors(generated_molecule)
         descriptors_of_generated_molecule = pd.DataFrame(descriptors_of_generated_molecule, index=descriptor_names)
         descriptors_of_generated_molecule = descriptors_of_generated_molecule.T
-        descriptors_of_generated_molecule = descriptors_of_generated_molecule.drop(descriptors_of_generated_molecule.columns[nan_variable_flags], axis=1)  # NaN を含む変数を削除
-        descriptors_of_generated_molecule = descriptors_of_generated_molecule.drop(descriptors_of_generated_molecule.columns[std_0_variable_flags], axis=1)
-        descriptors_of_generated_molecule = descriptors_of_generated_molecule.replace(np.inf, np.nan).fillna(np.nan)  # inf を NaN に置き換え
+        descriptors_of_generated_molecule = descriptors_of_generated_molecule.drop(
+            descriptors_of_generated_molecule.columns[nan_variable_flags], axis=1)  # NaN を含む変数を削除
+        descriptors_of_generated_molecule = descriptors_of_generated_molecule.drop(
+            descriptors_of_generated_molecule.columns[std_0_variable_flags], axis=1)
+        descriptors_of_generated_molecule = descriptors_of_generated_molecule.replace(np.inf, np.nan).fillna(
+            np.nan)  # inf を NaN に置き換え
         if descriptors_of_generated_molecule.isnull().sum(axis=1)[0] > 0:
             value = minimum_number
         else:
@@ -191,62 +195,63 @@ for iteration_number in range(number_of_iteration_of_ga):
     # random.seed(100)
     random.seed()
     pop = toolbox.population(n=number_of_population)
-    
+
     print('Start of evolution')
-    
+
     fitnesses = list(map(toolbox.evaluate, pop))
     for ind, fit in zip(pop, fitnesses):
         ind.fitness.values = fit
-    
+
     print('  Evaluated %i individuals' % len(pop))
-    
+
     for generation in range(number_of_generation):
         print('-- Generation {0} --'.format(generation + 1))
-    
+
         offspring = toolbox.select(pop, len(pop))
         offspring = list(map(toolbox.clone, offspring))
-    
+
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
             if random.random() < probability_of_crossover:
                 toolbox.mate(child1, child2)
                 del child1.fitness.values
                 del child2.fitness.values
-    
+
         for mutant in offspring:
             if random.random() < probability_of_mutation:
                 toolbox.mutate(mutant)
                 del mutant.fitness.values
-    
+
         invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
         fitnesses = map(toolbox.evaluate, invalid_ind)
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
-    
+
         print('  Evaluated %i individuals' % len(invalid_ind))
-    
+
         pop[:] = offspring
         fits = [ind.fitness.values[0] for ind in pop]
-    
+
         length = len(pop)
         mean = sum(fits) / length
         sum2 = sum(x * x for x in fits)
         std = abs(sum2 / length - mean ** 2) ** 0.5
-    
+
         print('  Min %s' % min(fits))
         print('  Max %s' % max(fits))
         print('  Avg %s' % mean)
         print('  Std %s' % std)
-    
+
     print('-- End of (successful) evolution --')
-    
-#    best_individual = tools.selBest(pop, 1)[0]
-#    best_value = best_individual.fitness.values[0]
+
+    #    best_individual = tools.selBest(pop, 1)[0]
+    #    best_value = best_individual.fitness.values[0]
     for each_pop in pop:
         if each_pop.fitness.values[0] is not minimum_number:
             estimated_y_all.append(each_pop.fitness.values[0])
             each_pop_array = np.array(each_pop)
-            smiles = structure_generator.structure_generator_based_on_r_group(main_molecules, fragment_molecules, each_pop_array)
+            smiles = structure_generator.structure_generator_based_on_r_group(main_molecules, fragment_molecules,
+                                                                              each_pop_array)
             generated_smiles_all.append(smiles)
-    
+
 estimated_y_all = pd.DataFrame(estimated_y_all, index=generated_smiles_all, columns=['estimated_y'])
 estimated_y_all.to_csv('generated_molecules.csv')

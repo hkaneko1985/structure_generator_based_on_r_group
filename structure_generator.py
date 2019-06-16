@@ -30,16 +30,16 @@ def structure_generator_based_on_r_group(main_molecules, fragment_molecules, chr
     smiles : str
     """
 
-
     bond_list = [Chem.rdchem.BondType.UNSPECIFIED, Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
                  Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.QUADRUPLE, Chem.rdchem.BondType.QUINTUPLE,
                  Chem.rdchem.BondType.HEXTUPLE, Chem.rdchem.BondType.ONEANDAHALF, Chem.rdchem.BondType.TWOANDAHALF,
-                 Chem.rdchem.BondType.THREEANDAHALF, Chem.rdchem.BondType.FOURANDAHALF, Chem.rdchem.BondType.FIVEANDAHALF,
+                 Chem.rdchem.BondType.THREEANDAHALF, Chem.rdchem.BondType.FOURANDAHALF,
+                 Chem.rdchem.BondType.FIVEANDAHALF,
                  Chem.rdchem.BondType.AROMATIC, Chem.rdchem.BondType.IONIC, Chem.rdchem.BondType.HYDROGEN,
                  Chem.rdchem.BondType.THREECENTER, Chem.rdchem.BondType.DATIVEONE, Chem.rdchem.BondType.DATIVE,
                  Chem.rdchem.BondType.DATIVEL, Chem.rdchem.BondType.DATIVER, Chem.rdchem.BondType.OTHER,
                  Chem.rdchem.BondType.ZERO]
-    
+
     selected_main_molecule_number = np.floor(chromosome[0] * len(main_molecules)).astype(int)
     if selected_main_molecule_number == len(main_molecules):
         selected_main_molecule_number = len(main_molecules) - 1
@@ -52,7 +52,7 @@ def structure_generator_based_on_r_group(main_molecules, fragment_molecules, chr
     main_atoms = []
     for atom in main_molecule.GetAtoms():
         main_atoms.append(atom.GetSymbol())
-    
+
     r_index_in_main_molecule_old = [index for index, atom in enumerate(main_atoms) if atom == '*']
     for index, r_index in enumerate(r_index_in_main_molecule_old):
         modified_index = r_index - index
@@ -65,24 +65,24 @@ def structure_generator_based_on_r_group(main_molecules, fragment_molecules, chr
         main_adjacency_matrix = np.delete(main_adjacency_matrix, modified_index, 0)
         main_adjacency_matrix = np.r_[main_adjacency_matrix, tmp]
     r_index_in_main_molecule_new = [index for index, atom in enumerate(main_atoms) if atom == '*']
-    
+
     r_bonded_atom_index_in_main_molecule = []
     for number in r_index_in_main_molecule_new:
         r_bonded_atom_index_in_main_molecule.append(np.where(main_adjacency_matrix[number, :] != 0)[0][0])
     r_bond_number_in_main_molecule = main_adjacency_matrix[
         r_index_in_main_molecule_new, r_bonded_atom_index_in_main_molecule]
-    
+
     main_adjacency_matrix = np.delete(main_adjacency_matrix, r_index_in_main_molecule_new, 0)
     main_adjacency_matrix = np.delete(main_adjacency_matrix, r_index_in_main_molecule_new, 1)
-    
+
     for i in range(len(r_index_in_main_molecule_new)):
         main_atoms.remove('*')
     main_size = main_adjacency_matrix.shape[0]
-    
+
     fragment_chromosome = chromosome[1:]
     fragment_numbers = fragment_chromosome.argsort()[::-1]
     selected_fragment_numbers = fragment_numbers[:len(r_index_in_main_molecule_old)]
-      
+
     generated_molecule_atoms = main_atoms[:]
     generated_adjacency_matrix = main_adjacency_matrix.copy()
     for r_number_in_molecule in range(len(r_index_in_main_molecule_new)):
@@ -145,4 +145,3 @@ def structure_generator_based_on_r_group(main_molecules, fragment_molecules, chr
     generated_molecule = generated_molecule.GetMol()
 
     return Chem.MolToSmiles(generated_molecule)
-
