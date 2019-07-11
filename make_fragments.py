@@ -6,19 +6,23 @@
 from rdkit import Chem
 from rdkit.Chem import BRICS
 
-number_of_free_bonds = 0  # The number of free bond(s) restricted. If 0, all fragments are saved
+number_of_free_bonds = 1  # The number of free bond(s) restricted. If 0, all fragments are saved
 
 # load molecules
-molecules = [molecule for molecule in Chem.SmilesMolSupplier('logS_molecules_1290.smi',
+molecules = [molecule for molecule in Chem.SmilesMolSupplier('molecules_for_prediction.smi',
                                                              delimiter='\t', titleLine=False)
              if molecule is not None]
+#molecules = [molecule for molecule in Chem.SmilesMolSupplier('logS_molecules_1290.smi',
+#                                                             delimiter='\t', titleLine=False)
+#             if molecule is not None]
+
 # molecules = [molecule for molecule in Chem.SDMolSupplier('logSdataset1290_2d.sdf') if molecule is not None]
 print('number of molecules :', len(molecules))
 
 # generate fragments
 fragments = set()
 for molecule in molecules:
-    fragment = BRICS.BRICSDecompose(molecule, minFragmentSize=2)
+    fragment = BRICS.BRICSDecompose(molecule, minFragmentSize=1)
     fragments.update(fragment)
 
 # select and arange fragments
