@@ -6,6 +6,8 @@
 import random
 import sys
 
+import matplotlib.figure as figure
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import structure_generator
@@ -16,18 +18,24 @@ from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors
 from rdkit.ML.Descriptors import MoleculeDescriptors
 from scipy.spatial.distance import cdist
+from scipy.stats import norm
 from sklearn import metrics
 from sklearn import svm
 from sklearn.cross_decomposition import PLSRegression
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import Matern, DotProduct, WhiteKernel, RBF, ConstantKernel
 from sklearn.model_selection import cross_val_predict, GridSearchCV
 
 dataset = pd.read_csv('molecules_with_logS.csv', index_col=0)  # SMILES 付きデータセットの読み込み
 file_name_of_main_fragments = 'sample_main_fragments.smi'  # 'r_group' 主骨格のフラグメントがあるファイル名。サンプルとして、'sample_main_fragments.smi' があります。
 file_name_of_sub_fragments = 'sample_sub_fragments.smi'  # 'r_group' 側鎖のフラグメントがあるファイル名。サンプルとして、'sample_main_fragments.smi' があります
+# deleting_descriptor_names = ['Ipc', 'Kappa3']
+deleting_descriptor_names = []
 number_of_iteration_of_ga = 10  # GA による構造生成を何回繰り返すか (number_of_iteration_of_ga × number_of_population) の数だけ化学構造が得られます
 
-method_name = 'svr'  # 'pls' or 'svr'
+method_name = 'gp'  # 'pls' or 'svr' or 'gp'
 
+target_range = [1, 3]  # target range of y. This is active only for 'gp'
 fold_number = 5  # N-fold CV の N
 max_number_of_principal_components = 30  # 使用する主成分の最大数
 svr_cs = 2 ** np.arange(-5, 11, dtype=float)  # C の候補
@@ -40,7 +48,7 @@ probability_of_mutation = 0.2
 threshold_of_variable_selection = 0.5
 minimum_number = -10 ** 10
 
-if method_name != 'pls' and method_name != 'svr':
+if method_name != 'pls' and method_name != 'svr' and method_name != 'gp':
     sys.exit('\'{0}\' という回帰分析手法はありません。method_name を見直してください。'.format(method_name))
 
 smiles = dataset.iloc[:, 0]  # 分子の SMILES
@@ -61,6 +69,8 @@ for index, smiles_i in enumerate(smiles):
     molecule = Chem.MolFromSmiles(smiles_i)
     descriptors.append(descriptor_calculator.CalcDescriptors(molecule))
 original_x = pd.DataFrame(descriptors, index=dataset.index, columns=descriptor_names)
+if deleting_descriptor_names is not None:
+    original_x = original_x.drop(deleting_descriptor_names, axis=1)
 original_x = original_x.replace(np.inf, np.nan).fillna(np.nan)  # inf を NaN に置き換え
 nan_variable_flags = original_x.isnull().any()  # NaN を含む変数
 original_x = original_x.drop(original_x.columns[nan_variable_flags], axis=1)  # NaN を含む変数を削除
@@ -117,6 +127,8 @@ elif method_name == 'svr':
     print('C : {0}\nε : {1}\nGamma : {2}'.format(optimal_svr_c, optimal_svr_epsilon, optimal_svr_gamma))
     # SVR
     model = svm.SVR(kernel='rbf', C=optimal_svr_c, epsilon=optimal_svr_epsilon, gamma=optimal_svr_gamma)  # モデルの宣言
+elif method_name == 'gp':  # Gaussian process
+    model = GaussianProcessRegressor(ConstantKernel() * RBF() + WhiteKernel())
 
 model.fit(autoscaled_x, autoscaled_y)  # モデルの構築
 if method_name == 'pls':
@@ -164,6 +176,9 @@ def evalOneMax(individual):
         descriptors_of_generated_molecule = descriptor_calculator.CalcDescriptors(generated_molecule)
         descriptors_of_generated_molecule = pd.DataFrame(descriptors_of_generated_molecule, index=descriptor_names)
         descriptors_of_generated_molecule = descriptors_of_generated_molecule.T
+        if deleting_descriptor_names is not None:
+            descriptors_of_generated_molecule = descriptors_of_generated_molecule.drop(deleting_descriptor_names,
+                                                                                       axis=1)
         descriptors_of_generated_molecule = descriptors_of_generated_molecule.drop(
             descriptors_of_generated_molecule.columns[nan_variable_flags], axis=1)  # NaN を含む変数を削除
         descriptors_of_generated_molecule = descriptors_of_generated_molecule.drop(
@@ -175,8 +190,15 @@ def evalOneMax(individual):
         else:
             # オートスケーリング
             autoscaled_x_prediction = (descriptors_of_generated_molecule - x.mean()) / x.std()
-            value = np.ndarray.flatten(model.predict(autoscaled_x_prediction) * y.std() + y.mean())
-            value = value[0]
+            if method_name == 'gp':
+                estimated_y, std_of_estimated_y = model.predict(autoscaled_x_prediction, return_std=True)
+                estimated_y = estimated_y[0] * y.std() + y.mean()
+                std_of_estimated_y = std_of_estimated_y[0] * y.std()
+                value = norm.cdf(target_range[1], loc=estimated_y, scale=std_of_estimated_y) - norm.cdf(
+                    target_range[0], loc=estimated_y, scale=std_of_estimated_y)
+            else:
+                estimated_y = np.ndarray.flatten(model.predict(autoscaled_x_prediction) * y.std() + y.mean())
+                value = estimated_y[0]
     else:
         value = minimum_number
 
@@ -243,10 +265,8 @@ for iteration_number in range(number_of_iteration_of_ga):
 
     print('-- End of (successful) evolution --')
 
-    #    best_individual = tools.selBest(pop, 1)[0]
-    #    best_value = best_individual.fitness.values[0]
     for each_pop in pop:
-        if each_pop.fitness.values[0] is not minimum_number:
+        if each_pop.fitness.values[0] > minimum_number / 2:
             estimated_y_all.append(each_pop.fitness.values[0])
             each_pop_array = np.array(each_pop)
             smiles = structure_generator.structure_generator_based_on_r_group(main_molecules, fragment_molecules,
@@ -254,4 +274,5 @@ for iteration_number in range(number_of_iteration_of_ga):
             generated_smiles_all.append(smiles)
 
 estimated_y_all = pd.DataFrame(estimated_y_all, index=generated_smiles_all, columns=['estimated_y'])
+estimated_y_all = estimated_y_all.loc[~estimated_y_all.index.duplicated(keep='first'), :]  # 重複したサンプルの最初だけを残す
 estimated_y_all.to_csv('generated_molecules.csv')
