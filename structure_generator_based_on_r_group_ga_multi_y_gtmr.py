@@ -21,7 +21,7 @@ from rdkit.ML.Descriptors import MoleculeDescriptors
 
 warnings.filterwarnings('ignore')
 
-target_y_value = [1, 20, -20]  # y-target for inverse analysis
+target_y_value = [1, -60, 30]  # y-target for inverse analysis
 
 dataset = pd.read_csv('molecules_with_multi_y.csv', index_col=0)  # SMILES 付きデータセットの読み込み
 target_ranges = pd.read_csv('settings_of_target_ys.csv', index_col=0)  # 各 y の目標範囲の読み込み
