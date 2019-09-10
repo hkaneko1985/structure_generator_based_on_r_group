@@ -73,7 +73,7 @@ autoscaled_y = (y - y.mean()) / y.std()
 # modeling
 models = []
 for y_number in range(numbers_of_y):
-    model = GaussianProcessRegressor(ConstantKernel() * RBF() + WhiteKernel())
+    model = GaussianProcessRegressor(ConstantKernel() * RBF() + WhiteKernel(), alpha=0)
     model.fit(autoscaled_x, autoscaled_y.iloc[:, y_number])  # モデルの構築
     models.append(model)
 

@@ -128,7 +128,7 @@ elif method_name == 'svr':
     # SVR
     model = svm.SVR(kernel='rbf', C=optimal_svr_c, epsilon=optimal_svr_epsilon, gamma=optimal_svr_gamma)  # モデルの宣言
 elif method_name == 'gp':  # Gaussian process
-    model = GaussianProcessRegressor(ConstantKernel() * RBF() + WhiteKernel())
+    model = GaussianProcessRegressor(ConstantKernel() * RBF() + WhiteKernel(), alpha=0)
 
 model.fit(autoscaled_x, autoscaled_y)  # モデルの構築
 if method_name == 'pls':
